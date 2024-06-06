@@ -77,7 +77,7 @@ pub unsafe fn test_input_wrap(data: *const u8, size: usize) -> i32 {
 }
 
 #[doc(hidden)]
-pub static RUST_LIBFUZZER_DEBUG_PATH: OnceCell<String> = OnceCell::new();
+pub static MOVE_LIBFUZZER_DEBUG_PATH: OnceCell<String> = OnceCell::new();
 
 #[doc(hidden)]
 pub static MOVE_RUNNER : OnceCell<Mutex<MoveRunner>> = OnceCell::new();
@@ -122,10 +122,10 @@ pub extern "C" fn initialize(_argc: *const isize, _argv: *const *const *const u8
     }));
 
     
-    // Initialize the `RUST_LIBFUZZER_DEBUG_PATH` cell with the path so it can be
+    // Initialize the `MOVE_LIBFUZZER_DEBUG_PATH` cell with the path so it can be
     // reused with little overhead.
-    if let Ok(path) = std::env::var("RUST_LIBFUZZER_DEBUG_PATH") {
-        RUST_LIBFUZZER_DEBUG_PATH
+    if let Ok(path) = std::env::var("MOVE_LIBFUZZER_DEBUG_PATH") {
+        MOVE_LIBFUZZER_DEBUG_PATH
             .set(path)
             .expect("Since this is initialize it is only called once so can never fail");
     }
@@ -250,17 +250,17 @@ macro_rules! fuzz_target {
             /// Auto-generated function
             #[no_mangle]
             pub extern "C" fn rust_fuzzer_test_input(bytes: &[u8]) -> i32 {
-                // When `RUST_LIBFUZZER_DEBUG_PATH` is set, write the debug
+                // When `MOVE_LIBFUZZER_DEBUG_PATH` is set, write the debug
                 // formatting of the input to that file. This is only intended for
                 // `cargo fuzz`'s use!
 
-                // `RUST_LIBFUZZER_DEBUG_PATH` is set in initialization.
-                if let Some(path) = $crate::RUST_LIBFUZZER_DEBUG_PATH.get() {
+                // `MOVE_LIBFUZZER_DEBUG_PATH` is set in initialization.
+                if let Some(path) = $crate::MOVE_LIBFUZZER_DEBUG_PATH.get() {
                     use std::io::Write;
                     let mut file = std::fs::File::create(path)
-                        .expect("failed to create `RUST_LIBFUZZER_DEBUG_PATH` file");
+                        .expect("failed to create `MOVE_LIBFUZZER_DEBUG_PATH` file");
                     writeln!(&mut file, "{:?}", bytes)
-                        .expect("failed to write to `RUST_LIBFUZZER_DEBUG_PATH` file");
+                        .expect("failed to write to `MOVE_LIBFUZZER_DEBUG_PATH` file");
                     return 0;
                 }
 
