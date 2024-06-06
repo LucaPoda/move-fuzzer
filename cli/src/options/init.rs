@@ -2,8 +2,8 @@ use crate::{options::FuzzDirWrapper, project::FuzzProject, templates::create_tar
 use anyhow::{Context, Result};
 use clap::Parser;
 
-use move_package::BuildConfig;
-use std::{fs, io::Write, path::{Path, PathBuf}};
+
+use std::{fs, io::Write, path::{PathBuf}};
 
 #[derive(Clone, Debug, Parser)]
 pub struct Init {

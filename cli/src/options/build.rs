@@ -6,8 +6,8 @@ use crate::{
 use anyhow::{bail, Context, Result};
 use clap::Parser;
 
-use move_package::BuildConfig;
-use std::{path::{Path, PathBuf}, process::Command};
+
+use std::{process::Command};
 
 #[derive(Clone, Debug, Parser)]
 pub struct Build {

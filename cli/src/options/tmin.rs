@@ -5,7 +5,7 @@ use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use std::{path::PathBuf, time};
 
-use move_package::BuildConfig;
+
 
 #[derive(Clone, Debug, Parser)]
 pub struct Tmin {

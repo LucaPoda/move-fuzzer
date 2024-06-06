@@ -12,8 +12,8 @@ pub mod project;
 mod utils;
 use anyhow::Result;
 use clap::{Args, Parser};
-use move_package::BuildConfig;
-use std::path::PathBuf;
+
+
 
 use options::*;
 
@@ -174,7 +174,7 @@ impl FromStr for Fuzz {
 }
 
 impl Args for Fuzz {
-    fn augment_args(mut cmd: clap::Command) -> clap::Command {
+    fn augment_args(cmd: clap::Command) -> clap::Command {
         match cmd.get_name().to_lowercase().as_str() {
             "init" => Init::augment_args(cmd),
             "add" => Add::augment_args(cmd),
@@ -189,7 +189,7 @@ impl Args for Fuzz {
         }
     }
 
-    fn augment_args_for_update(mut cmd: clap::Command) -> clap::Command {
+    fn augment_args_for_update(cmd: clap::Command) -> clap::Command {
         match cmd.get_name().to_lowercase().as_str() {
             "init" => Init::augment_args_for_update(cmd),
             "add" => Add::augment_args_for_update(cmd),

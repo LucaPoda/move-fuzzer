@@ -5,8 +5,8 @@ use crate::{options::FuzzDirWrapper, RunCommand};
 use anyhow::{Context, Result};
 use clap::*;
 
-use move_package::BuildConfig;
-use std::path::{Path, PathBuf};
+
+
 
 #[derive(Clone, Debug, Parser)]
 pub struct Add {

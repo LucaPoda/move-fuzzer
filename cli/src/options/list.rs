@@ -2,8 +2,8 @@ use crate::{options::FuzzDirWrapper, project::FuzzProject, RunCommand};
 use anyhow::Result;
 use clap::Parser;
 
-use move_package::BuildConfig;
-use std::path::{Path, PathBuf};
+
+
 
 #[derive(Clone, Debug, Parser)]
 pub struct List {
