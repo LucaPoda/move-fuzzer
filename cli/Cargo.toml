@@ -1,0 +1,51 @@
+[package]
+name = "cli"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.52"
+colored = "2.0.0"
+difference = "2.0.0"
+serde_yaml = "0.9.34"
+clap = { version = "4", features = ["derive"] }
+walkdir = "2.3.1"
+codespan-reporting = "0.11.1"
+bcs = "0.1.4"
+tempfile = "3.2.0"
+current_platform = "0.2.0"
+cargo_metadata = "0.18.1"
+toml = "0.5.8"
+rustc_version = "0.4.0"
+
+move-bytecode-verifier = { path = "../move-sui/crates/move-bytecode-verifier" }
+move-disassembler = { path = "../move-sui/crates/move-disassembler" }
+move-docgen = { path = "../move-sui/crates/move-docgen" }
+move-command-line-common = { path = "../move-sui/crates/move-command-line-common" }
+move-bytecode-utils = { path = "../move-sui/crates/move-bytecode-utils" }
+move-coverage = { path = "../move-sui/crates/move-coverage" }
+move-core-types = { path = "../move-sui/crates/move-core-types" }
+move-ir-types = { path = "../move-sui/crates/move-ir-types" }
+move-compiler = { path = "../move-sui/crates/move-compiler" }
+move-stdlib = { path = "../move-sui/crates/move-stdlib" }
+move-stdlib-natives = { path = "../move-sui/crates/move-stdlib-natives" }
+move-vm-types = { path = "../move-sui/crates/move-vm-types" }
+move-vm-runtime = { path = "../move-sui/crates/move-vm-runtime" }
+move-vm-profiler = { path = "../move-sui/crates/move-vm-profiler" }
+move-vm-test-utils = { path = "../move-sui/crates/move-vm-test-utils" }
+move-read-write-set-types = { path = "../move-sui/crates/move-read-write-set-types" }
+move-binary-format = { path = "../move-sui/crates/move-binary-format" }
+move-package = { path = "../move-sui/crates/move-package" }
+move-prover = { path = "../move-sui/crates/move-prover" }
+move-unit-test = { path = "../move-sui/crates/move-unit-test" }
+move-errmapgen = { path = "../move-sui/crates/move-errmapgen" }
+move-bytecode-viewer = { path = "../move-sui/crates/move-bytecode-viewer" }
+
+[[bin]]
+name = "move-fuzzer-cli"
+path = "src/main.rs"
+test = false
+doc = false
+bench = false

@@ -1,0 +1,3 @@
+[submodule "move-sui"]
+	path = move-sui
+	url = https://github.com/move-language/move-sui.git

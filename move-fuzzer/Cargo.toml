@@ -1,0 +1,46 @@
+[package]
+name = "move-fuzzer"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+cc = { version = "1.0", features = ["parallel"] }
+
+[features]
+default = ["link_libfuzzer"]
+link_libfuzzer = []
+
+[dependencies]
+arbitrary = "1"
+once_cell = "1.7.2"
+bcs = "0.1.4"
+anyhow = "1.0.52"
+enum-as-inner = "0.6.0"
+serde = { version = "1.0.124", features = ["derive"] }
+itertools = "0.10.0"
+clap = { version = "4", features = ["derive"] }
+walkdir = "2.3.1"
+primitive-types = { version = "0.10.1", features = ["impl-serde"]}
+
+move-vm-runtime = { path = "../move-sui/crates/move-vm-runtime" }
+move-bytecode-verifier = { path = "../move-sui/crates/move-bytecode-verifier" }
+move-bytecode-utils = { path = "../move-sui/crates/move-bytecode-utils" }
+move-command-line-common = { path = "../move-sui/crates/move-command-line-common" }
+move-core-types = { path = "../move-sui/crates/move-core-types" }
+move-vm-types = { path = "../move-sui/crates/move-vm-types" }
+move-vm-test-utils = { path = "../move-sui/crates/move-vm-test-utils" }
+move-binary-format = { path = "../move-sui/crates/move-binary-format" }
+move-model = { path = "../move-sui/crates/move-model" }
+move-package = { path = "../move-sui/crates/move-package" }
+move-stdlib = { path = "../move-sui/crates/move-stdlib" }
+move-stdlib-natives = { path = "../move-sui/crates/move-stdlib-natives" }
+move-vm-config = { path = "../move-sui/crates/move-vm-config" }
+
+[[bin]]
+name = "move-fuzzer-worker"
+path = "src/main.rs"
+test = false
+doc = false
+bench = false
