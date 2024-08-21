@@ -1,4 +1,4 @@
-
+use std::fmt::format;
 use std::fmt::Debug;
 use std::path::PathBuf;
 
@@ -9,13 +9,13 @@ use move_binary_format::CompiledModule;
 use move_command_line_common::files::MOVE_COVERAGE_MAP_EXTENSION;
 use move_core_types::account_address::AccountAddress;
 use move_core_types::identifier::IdentStr;
-
+use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use move_core_types::runtime_value::serialize_values;
 use move_core_types::runtime_value::MoveValue;
 use move_core_types::vm_status::StatusCode;
 use move_vm_config::runtime::VMConfig;
 use move_vm_runtime::move_vm::MoveVM;
-
+use move_vm_test_utils::BlankStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 use move_coverage::coverage_map::{output_map_to_file, CoverageMap};
 
@@ -131,19 +131,6 @@ impl MoveRunner {
             coverage_map_dir
         }
     }
-
-    // todo: capire se il coverage che c'è adesso funziona uguale
-    // fn create_coverage(inputs: Vec<FuzzerType>, cov: Vec<u16>) -> Coverage {
-    //     let mut coverage_data = vec![];
-    //     for c in cov {
-    //         coverage_data.push(CoverageData { pc: c as u64 });
-    //     }
-    //     Coverage {
-    //         inputs,
-    //         data: coverage_data,
-    //     }
-    // }
-
     fn get_target_parameters(&self) -> Vec<FuzzerType> {
         self.target_function.args.clone()
     }

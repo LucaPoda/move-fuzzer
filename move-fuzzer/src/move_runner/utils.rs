@@ -16,7 +16,7 @@ use move_bytecode_utils::Modules;
 
 use crate::move_runner::types::FuzzerType;
 
-/// From https://github.com/kunalabs-io/sui-client-gen
+// From https://github.com/kunalabs-io/sui-client-gen
 pub fn add_modules_to_model<'a>(
     env: &mut GlobalEnv,
     modules: impl IntoIterator<Item = &'a CompiledModule>,
