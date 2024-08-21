@@ -41,8 +41,8 @@ impl RunCommand for Tmin {
 
 impl Tmin {
     pub fn exec_tmin(&self, project: &FuzzProject) -> Result<()> {
-        exec_build(&self.build, project, false)?;
-        let mut cmd = project.get_run_fuzzer_command(&self.build.target)?;
+        exec_build(&self.build, project)?;
+        let mut cmd = project.get_run_fuzzer_command(&self.build.target, None, vec![])?;
         cmd.arg("-minimize_crash=1")
             .arg(format!("-runs={}", self.runs))
             .arg(&self.test_case);

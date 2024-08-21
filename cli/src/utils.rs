@@ -14,7 +14,8 @@ pub fn find_package() -> Result<PathBuf> {
     let mut dir = env::current_dir()?;
     let mut data = Vec::new();
     loop {
-        let manifest_path = dir.join("Cargo.toml");
+        let manifest_path = dir.join("Move.toml");
+        println!("Manifest path = {:?}", manifest_path);
         match fs::File::open(&manifest_path) {
             Err(_) => {}
             Ok(mut f) => {
@@ -37,7 +38,7 @@ pub fn find_package() -> Result<PathBuf> {
             break;
         }
     }
-    bail!("could not find a cargo project")
+    bail!("could not find a move project")
 }
 
 pub fn is_fuzz_manifest(value: &toml::Value) -> bool {

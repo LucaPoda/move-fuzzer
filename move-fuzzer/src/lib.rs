@@ -4,18 +4,13 @@
 //! See [the `cargo-fuzz`
 //! guide](https://rust-fuzz.github.io/book/cargo-fuzz.html) for a usage
 //! tutorial.
-//!
-//! The main export of this crate is [the `fuzz_target!`
-//! macro](./macro.fuzz_target.html), which allows you to define targets for
-//! libFuzzer to exercise.
 
 #![deny(missing_docs, missing_debug_implementations)]
 
-
 mod move_runner;
 
-use std::sync::Mutex;
-use clap::{ArgGroup, Parser};
+use std::{path::PathBuf, sync::Mutex};
+use clap::{Parser};
 use once_cell::sync::OnceCell;
 use crate::move_runner::MoveRunner;
 
@@ -52,18 +47,35 @@ impl Corpus {
 
 extern "C" {
     // We do not actually cross the FFI bound here.
-    #[allow(improper_ctypes)]
-    fn rust_fuzzer_test_input(input: &[u8]) -> i32;
+    // #[allow(improper_ctypes)]
+    // fn rust_fuzzer_test_input(input: &[u8]) -> i32;
     fn LLVMFuzzerMutate(data: *mut u8, size: usize, max_size: usize) -> usize;
 }
 
 /// Do not use; only for LibFuzzer's consumption.
 #[doc(hidden)]
 #[export_name = "LLVMFuzzerTestOneInput"]
-pub unsafe fn test_input_wrap(data: *const u8, size: usize) -> i32 {
+pub fn test_input(data: *const u8, size: usize) -> i32 {
     let test_input = ::std::panic::catch_unwind(|| {
-        let data_slice = ::std::slice::from_raw_parts(data, size);
-        rust_fuzzer_test_input(data_slice)
+        let data_slice = unsafe {
+            std::slice::from_raw_parts(data, size)
+        };
+
+        if let Some(path) = MOVE_LIBFUZZER_DEBUG_PATH.get() {
+            use std::io::Write;
+            let mut file = std::fs::File::create(path)
+                .expect("failed to create `MOVE_LIBFUZZER_DEBUG_PATH` file");
+            writeln!(&mut file, "{:?}", data)
+                .expect("failed to write to `MOVE_LIBFUZZER_DEBUG_PATH` file");
+            return 0;
+        }
+    
+        let mut runner = MOVE_RUNNER.get().unwrap().lock().unwrap();
+        if let Err(e) = (*runner).execute(data_slice) {
+            println!("{:?}", e.1);
+            std::process::abort();
+        }
+        0
     });
 
     match test_input {
@@ -80,7 +92,7 @@ pub unsafe fn test_input_wrap(data: *const u8, size: usize) -> i32 {
 pub static MOVE_LIBFUZZER_DEBUG_PATH: OnceCell<String> = OnceCell::new();
 
 #[doc(hidden)]
-pub static MOVE_RUNNER : OnceCell<Mutex<MoveRunner>> = OnceCell::new();
+pub static MOVE_RUNNER: OnceCell<Mutex<MoveRunner>> = OnceCell::new();
 
 #[derive(Clone, Debug, Eq, PartialEq, Parser)]
 #[command(allow_hyphen_values = true)]
@@ -88,7 +100,7 @@ pub static MOVE_RUNNER : OnceCell<Mutex<MoveRunner>> = OnceCell::new();
 pub struct Cli {
     #[clap(long)]
     /// todo
-    pub module_path: String,
+    pub module_path: PathBuf,
 
     #[clap(long)]
     /// todo
@@ -98,9 +110,17 @@ pub struct Cli {
     /// todo
     pub target_function: String,
 
+    #[clap(long)]
+    /// todo
+    pub coverage: bool,
+    
+    #[clap(long, requires("coverage"))]
+    /// todo
+    pub coverage_map_dir: Option<PathBuf>,
+
     #[clap(allow_hyphen_values = true)]
     /// todo
-    pub extra: Option<Vec<String>>
+    pub extra: Option<Vec<String>>,
 }
 
 #[doc(hidden)]
@@ -109,7 +129,7 @@ pub extern "C" fn initialize(_argc: *const isize, _argv: *const *const *const u8
     println!("RUST: Initialize {:?} {:?}", _argc, _argv);
     // Registers a panic hook that aborts the process before unwinding.
     // It is useful to abort before unwinding so that the fuzzer will then be
-    // able to analyse the process stack frames to tell different bugs appart.
+    // able to analyse the process stack frames to tell different bugs apart.
     //
     // HACK / FIXME: it would be better to use `-C panic=abort` but it's currently
     // impossible to build code using compiler plugins with this flag.
@@ -121,7 +141,6 @@ pub extern "C" fn initialize(_argc: *const isize, _argv: *const *const *const u8
         ::std::process::abort();
     }));
 
-    
     // Initialize the `MOVE_LIBFUZZER_DEBUG_PATH` cell with the path so it can be
     // reused with little overhead.
     if let Ok(path) = std::env::var("MOVE_LIBFUZZER_DEBUG_PATH") {
@@ -135,161 +154,15 @@ pub extern "C" fn initialize(_argc: *const isize, _argv: *const *const *const u8
     MOVE_RUNNER.set(
         Mutex::new(
             MoveRunner::new(
-                &cli.module_path.as_str(), 
-                &cli.target_module.as_str(),
-                &cli.target_function.as_str()
-            )
-        )
+                cli.module_path,
+                &cli.target_module,
+                &cli.target_function,
+                cli.coverage,
+                cli.coverage_map_dir,
+            ),
+        ),
     ).expect("Failed to initialize move runner");
     0
-}
-
-/// Define a fuzz target.
-///
-/// ## Example
-///
-/// This example takes a `&[u8]` slice and attempts to parse it. The parsing
-/// might fail and return an `Err`, but it shouldn't ever panic or segfault.
-///
-/// ```no_run
-/// #![no_main]
-///
-/// use libfuzzer::fuzz_target;
-///
-/// // Note: `|input|` is short for `|input: &[u8]|`.
-/// fuzz_target!(|input| {
-///     let _result: Result<_, _> = my_crate::parse(input);
-/// });
-/// # mod my_crate { pub fn parse(_: &[u8]) -> Result<(), ()> { unimplemented!() } }
-/// ```
-///
-/// ## Rejecting Inputs
-///
-/// It may be desirable to reject some inputs, i.e. to not add them to the
-/// corpus.
-///
-/// For example, when fuzzing an API consisting of parsing and other logic,
-/// one may want to allow only those inputs into the corpus that parse
-/// successfully. To indicate whether an input should be kept in or rejected
-/// from the corpus, return either [Corpus::Keep] or [Corpus::Reject] from your
-/// fuzz target. The default behavior (e.g. if `()` is returned) is to keep the
-/// input in the corpus.
-///
-/// For example:
-///
-/// ```no_run
-/// #![no_main]
-///
-/// use libfuzzer::{Corpus, fuzz_target};
-///
-/// fuzz_target!(|input: String| -> Corpus {
-///     let parts: Vec<&str> = input.splitn(2, '=').collect();
-///     if parts.len() != 2 {
-///         return Corpus::Reject;
-///     }
-///
-///     let key = parts[0];
-///     let value = parts[1];
-///     let _result: Result<_, _> = my_crate::parse(key, value);
-///     Corpus::Keep
-/// });
-/// # mod my_crate { pub fn parse(_key: &str, _value: &str) -> Result<(), ()> { unimplemented!() } }
-/// ```
-///
-/// ## Arbitrary Input Types
-///
-/// The input is a `&[u8]` slice by default, but you can take arbitrary input
-/// types, as long as the type implements [the `arbitrary` crate's `Arbitrary`
-/// trait](https://docs.rs/arbitrary/*/arbitrary/trait.Arbitrary.html) (which is
-/// also re-exported as `libfuzzer::arbitrary::Arbitrary` for convenience).
-///
-/// For example, if you wanted to take an arbitrary RGB color, you could do the
-/// following:
-///
-/// ```no_run
-/// #![no_main]
-/// # mod foo {
-///
-/// use libfuzzer::{arbitrary::{Arbitrary, Error, Unstructured}, fuzz_target};
-///
-/// #[derive(Debug)]
-/// pub struct Rgb {
-///     r: u8,
-///     g: u8,
-///     b: u8,
-/// }
-///
-/// impl<'a> Arbitrary<'a> for Rgb {
-///     fn arbitrary(raw: &mut Unstructured<'a>) -> Result<Self, Error> {
-///         let mut buf = [0; 3];
-///         raw.fill_buffer(&mut buf)?;
-///         let r = buf[0];
-///         let g = buf[1];
-///         let b = buf[2];
-///         Ok(Rgb { r, g, b })
-///     }
-/// }
-///
-/// // Write a fuzz target that works with RGB colors instead of raw bytes.
-/// fuzz_target!(|color: Rgb| {
-///     my_crate::convert_color(color);
-/// });
-/// # mod my_crate {
-/// #     use super::Rgb;
-/// #     pub fn convert_color(_: Rgb) {}
-/// # }
-/// # }
-/// ```
-///
-/// You can also enable the `arbitrary` crate's custom derive via this crate's
-/// `"arbitrary-derive"` cargo feature.
-#[macro_export]
-macro_rules! fuzz_target {
-    (|$bytes:ident| $body:expr) => {
-        const _: () = {
-            /// Auto-generated function
-            #[no_mangle]
-            pub extern "C" fn rust_fuzzer_test_input(bytes: &[u8]) -> i32 {
-                // When `MOVE_LIBFUZZER_DEBUG_PATH` is set, write the debug
-                // formatting of the input to that file. This is only intended for
-                // `cargo fuzz`'s use!
-
-                // `MOVE_LIBFUZZER_DEBUG_PATH` is set in initialization.
-                if let Some(path) = $crate::MOVE_LIBFUZZER_DEBUG_PATH.get() {
-                    use std::io::Write;
-                    let mut file = std::fs::File::create(path)
-                        .expect("failed to create `MOVE_LIBFUZZER_DEBUG_PATH` file");
-                    writeln!(&mut file, "{:?}", bytes)
-                        .expect("failed to write to `MOVE_LIBFUZZER_DEBUG_PATH` file");
-                    return 0;
-                }
-
-                __libfuzzer_sys_run(bytes);
-                0
-            }
-
-            // Split out the actual fuzzer into a separate function which is
-            // tagged as never being inlined. This ensures that if the fuzzer
-            // panics there's at least one stack frame which is named uniquely
-            // according to this specific fuzzer that this is embedded within.
-            //
-            // Systems like oss-fuzz try to deduplicate crashes and without this
-            // panics in separate fuzzers can accidentally appear the same
-            // because each fuzzer will have a function called
-            // `rust_fuzzer_test_input`. By using a normal Rust function here
-            // it's named something like `the_fuzzer_name::_::__libfuzzer_sys_run` which should
-            // ideally help prevent oss-fuzz from deduplicate fuzz bugs across
-            // distinct targets accidentally.
-            #[inline(never)] 
-            fn __libfuzzer_sys_run($bytes: &[u8]) {
-                $body
-            }
-        };
-    };
-
-    (|$data:ident: &[u8]| $body:expr) => {
-        $crate::fuzz_target!(|$data| $body);
-    };
 }
 
 /// Define a custom mutator.

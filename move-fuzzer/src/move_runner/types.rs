@@ -45,8 +45,8 @@ impl From<FuzzerType> for MoveType {
 }
 
 impl FuzzerType {
-    pub fn from(env: &GlobalEnv, value: MoveType) -> Self {
-        match value {
+    pub fn from(env: &GlobalEnv, move_type: MoveType) -> Self {
+        match move_type {
             MoveType::Primitive(p) => match p {
                 move_model::ty::PrimitiveType::Bool => FuzzerType::Bool,
                 move_model::ty::PrimitiveType::U8 => FuzzerType::U8,
@@ -57,12 +57,12 @@ impl FuzzerType {
                 move_model::ty::PrimitiveType::U256 => FuzzerType::U256,
                 move_model::ty::PrimitiveType::Address => FuzzerType::Address,
                 move_model::ty::PrimitiveType::Signer => FuzzerType::Signer,
-                move_model::ty::PrimitiveType::Num => todo!(),
-                move_model::ty::PrimitiveType::Range => todo!(),
-                move_model::ty::PrimitiveType::EventStore => todo!(),
+                move_model::ty::PrimitiveType::Num => unimplemented!(),
+                move_model::ty::PrimitiveType::Range => unimplemented!(),
+                move_model::ty::PrimitiveType::EventStore => unimplemented!(),
             },
-            MoveType::Vector(vec) => {
-                FuzzerType::Vector(Box::new(FuzzerType::from(env, *vec)))
+            MoveType::Vector(inner_type) => {
+                FuzzerType::Vector(Box::new(FuzzerType::from(env, *inner_type)))
             },
             MoveType::Struct(module_id, struct_id, _) => {
                 let module_env = env.get_modules().find(|m| m.get_id() == module_id).unwrap();
@@ -142,6 +142,7 @@ pub enum Error {
     OutOfGas { message: String },
     ArithmeticError { message: String },
     MemoryLimitExceeded { message: String },
+    MissingDependency { message: String },
     Unknown { message: String },
     AccountAddressParseError { message: String }
 }
@@ -157,6 +158,7 @@ impl Display for Error {
             Error::Unknown { message } => write!(f, "Unknown - {}", message),
             Error::Runtime { message } => write!(f, "Runtime - {}", message),
             Error::AccountAddressParseError { message } => write!(f, "AccountAddressParseError - {}", message),
+            Error::MissingDependency { message } => write!(f, "MissingDependency - {}", message),
         }
     }
 }

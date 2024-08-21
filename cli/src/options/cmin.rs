@@ -33,13 +33,7 @@ impl RunCommand for Cmin {
 
 impl Cmin {
     pub fn exec_cmin(&self, project: &FuzzProject) -> Result<()> {
-        exec_build(&self.build, project, false)?;
-        let mut cmd = project.get_run_fuzzer_command(&self.build.target)?;
-        // todo: trasformare cargo run nel comando che ritorna la chiamata al fuzzer installato
-
-        for arg in &self.args {
-            cmd.arg(arg);
-        }
+        exec_build(&self.build, project)?;
 
         let corpus = if let Some(corpus) = self.corpus.clone() {
             corpus
@@ -55,7 +49,13 @@ impl Cmin {
         let tmp_corpus = tmp.path().join("corpus");
         fs::create_dir(&tmp_corpus)?;
 
-        // cmd.arg("-merge=1").arg(&tmp_corpus).arg(&corpus); // todo: passare argomento a move-fuzzer
+        let mut cmd = project.get_run_fuzzer_command(&self.build.target, None, vec![])?;
+        // todo: trasformare cargo run nel comando che ritorna la chiamata al fuzzer installato
+        
+        cmd.arg("-merge=1").arg(&corpus); // todo: passare argomento a move-fuzzer
+        for arg in &self.args {
+            cmd.arg(arg);
+        }
 
         // Spawn cmd in child process instead of exec-ing it
         let status = cmd

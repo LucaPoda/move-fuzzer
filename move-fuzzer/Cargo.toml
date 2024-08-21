@@ -29,6 +29,7 @@ move-bytecode-verifier = { path = "../move-sui/crates/move-bytecode-verifier" }
 move-bytecode-utils = { path = "../move-sui/crates/move-bytecode-utils" }
 move-command-line-common = { path = "../move-sui/crates/move-command-line-common" }
 move-core-types = { path = "../move-sui/crates/move-core-types" }
+move-coverage = { path = "../move-sui/crates/move-coverage" }
 move-vm-types = { path = "../move-sui/crates/move-vm-types" }
 move-vm-test-utils = { path = "../move-sui/crates/move-vm-test-utils" }
 move-binary-format = { path = "../move-sui/crates/move-binary-format" }

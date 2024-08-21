@@ -21,7 +21,7 @@ pub struct Build {
 impl RunCommand for Build {
     fn run_command(&mut self)-> Result<()> {
         let project = FuzzProject::new(self.fuzz_dir_wrapper.fuzz_dir.to_owned())?;
-        exec_build(&self.build, &project, false)
+        exec_build(&self.build, &project)
     }
 }
 
@@ -50,20 +50,21 @@ fn move_build(build: &BuildOptions) -> Result<Command> {
 
 pub fn exec_build(
     build: &BuildOptions,
-    project: &FuzzProject,
-    coverage: bool
+    project: &FuzzProject
 ) -> Result<()> {
     let mut move_cmd = move_build(build)?;
 
-    if let Some(target_dir) = project.get_target_dir(&build.package_path, coverage)? {
+    if let Some(target_dir) = project.get_target_dir(&build.package_path) {
+        println!("{:?}", project.get_fuzz_dir());
         move_cmd.arg("--path").arg(&target_dir);
     }
     else {
+        println!("{:?}", project.get_fuzz_dir());
         move_cmd.arg("--path").arg(&project.get_fuzz_dir());
     }
 
     let mut move_build = Command::new("move");
-    move_build.arg("build").current_dir("fuzz");
+    move_build.arg("build").current_dir(project.get_fuzz_dir());
 
     let move_status = move_build
         .status()

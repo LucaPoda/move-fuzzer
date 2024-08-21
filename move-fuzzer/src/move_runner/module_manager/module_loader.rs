@@ -15,6 +15,7 @@ pub struct ModuleLoader {
 impl ModuleLoader {
     pub fn new(module_path: String) -> Self {
         let module = load_compiled_module(module_path.as_str());
+        
         ModuleLoader {
             module_path,
             module,
@@ -33,7 +34,8 @@ impl ModuleLoader {
             if path.is_file() && path != Path::new(self.module_path.as_str()) {
                 // Check if the file is a Move compiled module
                 if let Some(ext) = path.extension() {
-                    if ext == MOVE_COMPILED_EXTENSION{
+                    if ext == MOVE_COMPILED_EXTENSION {
+                        println!("{:?}", path.to_str().unwrap());
                         self.dependencies.push(load_compiled_module(path.to_str().unwrap()));
                     }
                 }

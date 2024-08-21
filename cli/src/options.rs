@@ -14,6 +14,7 @@ pub use self::{
 };
 
 use clap::*;
+use std::fs;
 use std::str::FromStr;
 use std::{fmt as stdfmt, path::PathBuf};
 use std::fmt::Debug;
@@ -30,7 +31,7 @@ pub struct BuildOptions {
     pub verbose: bool,
 
     #[clap(flatten)]
-    pub target: Target,
+    pub target: Target,             
 
     #[clap(flatten)] 
     /// move build options
@@ -53,13 +54,38 @@ pub struct Target {
 }
 
 impl Target {
-    pub fn get_module_name(&self) -> String {
+    pub fn get_target_module(&self) -> String {
         if let Some (module) = self.target_module.clone() {
             module
         }
         else {
             self.target_name.clone().expect("Module name or target name is required")
         }
+    }
+
+    pub fn get_module_path(&self, fuzz_dir: &PathBuf) -> Option<PathBuf> {
+        // Recursively search for the "bytecode_modules" directory
+        for entry in fs::read_dir(fuzz_dir).ok()? {
+            let entry = entry.ok()?;
+            let path = entry.path();
+    
+            // If the entry is a directory, check if its name is "bytecode_modules"
+            if path.is_dir() {
+                if path.ends_with("bytecode_modules") {
+                    // If found, append the module file name and return the path
+                    let mut module_path = path.clone();
+                    module_path.push(format!("{}.mv", self.get_target_module()));
+                    return Some(module_path);
+                } else {
+                    // Recursively search inside this directory
+                    if let Some(found_path) = self.get_module_path(&path) {
+                        return Some(found_path);
+                    }
+                }
+            }
+        }
+    
+        None
     }
 
     pub fn get_target_function(&self) -> String {
@@ -82,6 +108,15 @@ impl Target {
             format!("--target-module '{module}' --target-function '{function}")
         }
     }
+
+    // fn get_fuzz_dir(&self, fuzz_dir_opt: Option<PathBuf>) -> PathBuf {
+    //     if let Some(fuzz_dir) = fuzz_dir_opt {
+    //         fuzz_dir
+    //     }
+    //     else {
+            
+    //     }
+    // }
 }
 
 impl FromStr for BuildOptions {

@@ -152,7 +152,7 @@ impl RunCommand for Fuzz {
     }
 }
 
-use std::str::FromStr;
+use std::{process::exit, str::FromStr};
 
 impl FromStr for Fuzz {
     type Err = String; // Replace with the actual error type
@@ -212,5 +212,8 @@ impl Fuzz {
 }
 
 fn main() {
-    Fuzz::parse().execute();
+    if let Err(e) = Fuzz::parse().execute() {
+        eprintln!("{:?}", e);
+        exit(1);
+    }
 }

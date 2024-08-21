@@ -59,37 +59,35 @@ pub fn generate_abi_from_bin(
     modules: Vec<CompiledModule>,
     module_name: &str,
     function_name: &str,
-) -> (Vec<FuzzerType>, usize) {
+) -> Vec<FuzzerType> {
     let params;
-    let max_coverage;
 
     let module_map = Modules::new(modules.iter());
     let dep_graph = module_map.compute_dependency_graph();
-    let topo_order = dep_graph.compute_topological_order().unwrap();
+    let topological_order = dep_graph.compute_topological_order().unwrap();
 
-    let mut env = GlobalEnv::new();
-    add_modules_to_model(&mut env, topo_order);
+    let mut global_env = GlobalEnv::new();
+    add_modules_to_model(&mut global_env, topological_order);
 
-    let module_env = env.get_modules().find(|m| m.matches_name(module_name));
+    let module_env = global_env.get_modules().find(|m| m.matches_name(module_name));
     if let Some(env) = module_env {
-
         let func = env
             .get_functions()
             .find(|f| f.get_name_str() == function_name);
         if let Some(f) = func {
-            max_coverage = f.get_bytecode().len();
             params = f.get_parameter_types();
+            let result = transform_params(&global_env, params);
+            result
         } else {
             panic!("Could not find target function !");
         }
     } else {
         panic!("Could not find target module !")
     }
-    println!("ABI generation completed...");
-    (transform_params(&env, params), max_coverage)
 }
 
 pub fn load_compiled_module(path: &str) -> CompiledModule {
+    println!("Loading module: {}", path);
     let mut f = File::open(path).unwrap();
     let mut buffer = Vec::new();
     f.read_to_end(&mut buffer).unwrap();

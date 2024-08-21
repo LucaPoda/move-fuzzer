@@ -1,10 +1,11 @@
-use std::{env, fs, path::{Path, PathBuf}, process::Command};
+use std::{ffi::OsStr, fs::{self}, path::{Path, PathBuf}, process::Command};
 
 use crate::{
-    build::exec_build, options::{BuildOptions, FuzzDirWrapper}, project::FuzzProject, utils::rustlib, RunCommand
+    build::exec_build, options::{BuildOptions, FuzzDirWrapper}, project::FuzzProject, RunCommand
 };
 use anyhow::{anyhow, bail, Context, Result};
 use clap::Parser;
+
 
 #[derive(Clone, Debug, Parser)]
 pub struct Coverage {
@@ -37,7 +38,7 @@ impl Coverage {
     /// Produce self information for a given corpus
     pub fn exec_coverage(&self, project: &FuzzProject) -> Result<()> {
         // Build project with source-based self generation enabled.
-        exec_build(&self.build, project, true)?;
+        exec_build(&self.build, project)?;
 
         // Retrieve corpus directories.
         let corpora = if self.corpus.is_empty() {
@@ -50,14 +51,17 @@ impl Coverage {
                 .collect()
         };
 
+        println!("Corpora: {:?}", corpora);
+
         // Collect the (non-directory) readable input files from the corpora.
         let files_and_dirs = corpora.iter().flat_map(fs::read_dir).flatten().flatten();
         let mut readable_input_files = files_and_dirs
-            .filter(|file| match file.file_type() {
-                Ok(ft) => ft.is_file(),
-                _ => false,
+        .filter(|file| match file.file_type() {
+            Ok(ft) => ft.is_file(),
+            _ => false,
             })
             .peekable();
+        
         if readable_input_files.peek().is_none() {
             bail!(
                 "The corpus does not contain program-input files. \
@@ -67,12 +71,15 @@ impl Coverage {
             )
         }
 
-        let (self_out_raw_dir, self_out_file) = project.coverage_for(&self.build.target)?;
+        let (self_out_raw_dir, self_out_file, self_coverage_map) = project.coverage_for(&self.build.target)?;
+        println!("Raw dir:{:?}", self_out_raw_dir);
+        println!("Out file:{:?}", self_out_file);
+        println!("Map file:{:?}", self_coverage_map);
 
         for corpus in corpora.iter() {
             // _tmp_dir is deleted when it goes of of scope.
             let (mut cmd, _tmp_dir) =
-                self.create_coverage_cmd(project, &self_out_raw_dir, &corpus.as_path())?;
+                self.create_coverage_cmd(project, &self_coverage_map, corpus)?;
             eprintln!("Generating self data for corpus {:?}", corpus);
             let status = cmd
                 .status()
@@ -87,13 +94,15 @@ impl Coverage {
             }
         }
 
-        let mut profdata_bin_path = self.llvm_path.clone().unwrap_or(rustlib()?);
-        profdata_bin_path.push(format!("llvm-profdata{}", env::consts::EXE_SUFFIX));
-        Self::merge_coverage(
-            &profdata_bin_path,
-            &self_out_raw_dir,
-            &self_out_file,
-        )?;
+        // coverage merging not implemented yet
+
+        // let mut profdata_bin_path = self.llvm_path.clone().unwrap_or(rustlib()?);
+        // profdata_bin_path.push(format!("llvm-profdata{}", env::consts::EXE_SUFFIX));
+        // Self::merge_coverage(
+        //     &profdata_bin_path,
+        //     &self_out_raw_dir,
+        //     &self_out_file,
+        // )?;
 
         Ok(())
     }
@@ -101,45 +110,24 @@ impl Coverage {
     fn create_coverage_cmd(
         &self,
         project: &FuzzProject,
-        coverage_dir: &Path,
-        corpus_dir: &Path,
+        coverage_dir: &PathBuf,
+        corpus_dir: &PathBuf,
     ) -> Result<(Command, tempfile::TempDir)> {
-
-        // todo: probabilmente binpath è semplicemente il nome dell'eseguibile
-        let bin_path = {
-            let profile_subdir = if self.build.build_config.dev_mode {
-                "debug"
-            } else {
-                "release"
-            };
-
-            let target_dir = project
-                .get_target_dir(&self.build.package_path, true)?
-                .expect("target dir for coverage command should never be None");
-            target_dir
-                .join(profile_subdir)
-                // .join(&self.target) // todo
-        };
-
-        let mut cmd = Command::new(bin_path);
-
-        // Raw coverage data will be saved in `coverage/<target>` directory.
-        let corpus_dir_name = corpus_dir
-            .file_name()
-            .and_then(|x| x.to_str())
-            .with_context(|| format!("Invalid corpus directory: {:?}", corpus_dir))?;
-        cmd.env(
-            "LLVM_PROFILE_FILE",
-            coverage_dir.join(format!("default-{}.profraw", corpus_dir_name)),
-        );
-        cmd.arg("-merge=1");
         let dummy_corpus = tempfile::tempdir()?;
-        cmd.arg(dummy_corpus.path());
-        cmd.arg(corpus_dir);
+        let args: Vec<Box<dyn AsRef<OsStr>>> = vec![
+            Box::new(PathBuf::from(dummy_corpus.path())),
+            Box::new(corpus_dir.clone())
+        ];
+
+        let mut cmd = project.get_run_fuzzer_command(&self.build.target, Some(coverage_dir), args)?;
+        
+        cmd.arg("-merge=1");
 
         for arg in &self.args {
             cmd.arg(arg);
         }
+
+        println!("CMD: {:?}", cmd);
 
         Ok((cmd, dummy_corpus))
     }

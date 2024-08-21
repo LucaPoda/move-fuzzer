@@ -13,7 +13,7 @@ use std::collections::HashMap;
 #[derive(Clone, Debug)]
 pub struct ModuleStore {
     modules: HashMap<ModuleId, Vec<u8>>,
-}
+}   
 
 impl ModuleStore {
     pub fn new(root_module: CompiledModule) -> Self {

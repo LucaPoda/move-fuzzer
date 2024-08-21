@@ -4,7 +4,7 @@ use crate::{
 use anyhow::{bail, Context, Result};
 use clap::Parser;
 
-use std::{fs, path::Path, process::Stdio, time};
+use std::{ffi::OsStr, fs, path::Path, process::Stdio, time};
 
 #[derive(Clone, Debug, Parser)]
 pub struct Run {
@@ -37,7 +37,6 @@ impl RunCommand for Run {
     }
 }
 
-
 pub fn run_fuzz_target_debug_formatter(
     project: &FuzzProject,
     build: &BuildOptions,
@@ -46,7 +45,7 @@ pub fn run_fuzz_target_debug_formatter(
 ) -> Result<String> {
     let debug_output = tempfile::NamedTempFile::new().context("failed to create temp file")?;
 
-    let mut cmd = project.get_run_fuzzer_command(&build.target)?;
+    let mut cmd = project.get_run_fuzzer_command(&build.target, None, vec![])?;
     cmd.stdin(Stdio::null());
     cmd.env("MOVE_LIBFUZZER_DEBUG_PATH", debug_output.path());
     cmd.arg(artifact);
@@ -88,29 +87,31 @@ pub fn run_fuzz_target_debug_formatter(
     Ok(debug)
 }
 
-
 impl Run {
     /// Fuzz a given fuzz target
     pub fn exec_fuzz(&self, project: &FuzzProject) -> Result<()> {
-        exec_build(&self.build, project, false)?;
-        let mut cmd = project.get_run_fuzzer_command(&self.build.target)?;
+        exec_build(&self.build, project)?;
 
-        for arg in &self.args {
-            cmd.arg(arg);
-        }
-
+        let mut args: Vec<Box<dyn AsRef<OsStr>>> = vec![];
         if !self.corpus.is_empty() {
-            for corpus in &self.corpus {
-                cmd.arg(corpus);
+            for corpus in self.corpus.clone() {
+                args.push(Box::new(corpus));
             }
         } else {
-            cmd.arg(project.corpus_for(&self.build.target)?);
+            args.push(Box::new(project.corpus_for(&self.build.target)?))
         }
+
+        let mut cmd = project.get_run_fuzzer_command(&self.build.target, None, args)?;
 
         if self.jobs != 1 {
             cmd.arg(format!("-fork={}", self.jobs));
         }
 
+        for arg in &self.args {
+            cmd.arg(arg);
+        }
+
+        println!("{:?}", cmd);
         // When libfuzzer finds failing inputs, those inputs will end up in the
         // artifacts directory. To easily filter old artifacts from new ones,
         // get the current time, and then later we only consider files modified

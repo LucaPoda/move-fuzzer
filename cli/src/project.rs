@@ -1,25 +1,26 @@
 
 
 
-use crate::utils::{collect_targets, default_target, is_fuzz_manifest, manage_initial_instance};
+use crate::utils::{collect_targets, manage_initial_instance};
 use crate::{Target};
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 
 
 use std::collections::HashSet;
-use std::ffi;
+use std::ffi::{self, OsStr};
+use std::fs::create_dir_all;
 use std::io::Read;
 
 use std::path::{Path, PathBuf};
 use std::{
-    env, fs,
+    fs,
     process::{Command},
     time,
 };
 
 pub(crate) const DEFAULT_FUZZ_DIR: &str = "fuzz";
 
-pub(crate) struct FuzzProject {
+pub struct FuzzProject {
     /// The project with fuzz targets
     pub(crate) fuzz_dir: PathBuf,
     pub(crate) targets: Vec<String>,
@@ -36,13 +37,13 @@ impl FuzzProject {
     pub(crate) fn new(fuzz_dir_opt: Option<PathBuf>) -> Result<Self> {
         let mut project = manage_initial_instance(fuzz_dir_opt)?;
         let manifest = project.manifest()?;
-        if !is_fuzz_manifest(&manifest) {
-            bail!(
-                "manifest `{}` does not look like a move-fuzz manifest. \
-                 The package name should end with \"fuzz\"",
-                project.get_manifest_path().display()
-            );
-        }
+        // if !is_fuzz_manifest(&manifest) {
+        //     bail!(
+        //         "manifest `{}` does not look like a move-fuzz manifest. \
+        //          The package name should end with \"fuzz\"",
+        //         project.get_manifest_path().display()
+        //     );
+        // }
         project.targets = collect_targets(&manifest);
         Ok(project)
     }
@@ -79,24 +80,13 @@ impl FuzzProject {
         root
     }
 
-    // note: never returns Ok(None) if build.coverage is true
-    pub(crate) fn get_target_dir(&self, path: &Option<PathBuf>, coverage: bool) -> Result<Option<PathBuf>> {
-        // Use the user-provided target directory, if provided. Otherwise if building for coverage,
-        // use the coverage directory
+    pub(crate) fn get_target_dir(&self, path: &Option<PathBuf>) -> Option<PathBuf> {
+        // Use the user-provided target directory, if provided.
         if let Some(target_dir) = path.clone() {
-            return Ok(Some(target_dir));
-        } else if coverage {
-            // To ensure that fuzzing and coverage-output generation can run in parallel, we
-            // produce a separate binary for the coverage command.
-            let current_dir = env::current_dir()?;
-            Ok(Some(
-                current_dir
-                    .join("target")
-                    .join(default_target())
-                    .join("coverage"),
-            ))
-        } else {
-            Ok(None)
+            return Some(target_dir);
+        } 
+        else {
+            None
         }
     }
 
@@ -134,56 +124,77 @@ impl FuzzProject {
         Ok(artifacts)
     }
 
-    pub(crate) fn get_run_fuzzer_command(&self, target: &Target) -> Result<Command> {
-        let mut module_path = self.fuzz_dir.clone();
-        module_path.push("build");
-        module_path.push("fuzz");
-        module_path.push("bytecode_modules");
-        module_path.push(format!("{}.mv", target.get_module_name()));
-
-        let mut cmd = Command::new("move-fuzzer-worker");
+    pub(crate) fn get_run_fuzzer_command(&self, target: &Target, coverage_dir: Option<&PathBuf>, args: Vec<Box<dyn AsRef<OsStr>>>) -> Result<Command> {
+        let module_path = target.get_module_path(&self.fuzz_dir).expect("Module path not found");
 
         let mut module_path_arg = ffi::OsString::from("--module-path=");    
         module_path_arg.push(module_path);
-
+        
         let mut target_module_arg = ffi::OsString::from("--target-module=");    
-        target_module_arg.push(target.get_module_name());
-
+        target_module_arg.push(target.get_target_module());
+        
         let mut target_function_arg = ffi::OsString::from("--target-function=");    
         target_function_arg.push(target.get_target_function());
-
+        
         let mut artifact_arg = ffi::OsString::from("-artifact_prefix=");
         artifact_arg.push(self.artifacts_for(target)?);
         
+        let mut runs_arg = ffi::OsString::from("-runs=");
+        runs_arg.push("100000");
+        
+
+        let mut cmd = Command::new("move-fuzzer-worker");
+        
         cmd.arg(module_path_arg)
             .arg(target_module_arg)
-            .arg(target_function_arg)
-            .arg(artifact_arg);
+            .arg(target_function_arg);
+
+        if let Some(coverage_dir) = coverage_dir {
+            create_dir_all(coverage_dir)?;
+        
+            cmd.arg("--coverage");
+            cmd.arg("--coverage-map-dir").arg(coverage_dir);
+        }
+
+        for arg in args {
+            cmd.arg(arg.as_ref());
+        }
+
+        cmd.arg(artifact_arg);
+        cmd.arg(runs_arg);
 
         Ok(cmd)
     }
 
     /// Returns paths to the `coverage/<target>/raw` directory and `coverage/<target>/coverage.profdata` file.
-    pub(crate) fn coverage_for(&self, target: &Target) -> Result<(PathBuf, PathBuf)> {
+    pub(crate) fn coverage_for(&self, target: &Target) -> Result<(PathBuf, PathBuf, PathBuf)> {
+        println!("fesu");
         let mut coverage_data = self.get_fuzz_dir().to_owned();
         coverage_data.push("coverage");
-        coverage_data.push(target.get_module_name());
+        coverage_data.push(target.get_target_module());
         coverage_data.push(target.get_target_function());
 
         let mut coverage_raw = coverage_data.clone();
+        let mut coverage_map = coverage_data.clone();
         coverage_data.push("coverage.profdata");
         coverage_raw.push("raw");
+        coverage_map.push("map");
 
         fs::create_dir_all(&coverage_raw).with_context(|| {
             format!("could not make a coverage directory at {:?}", coverage_raw)
         })?;
-        Ok((coverage_raw, coverage_data))
+
+        println!("Data: {:?}", coverage_data);
+        println!("Raw: {:?}", coverage_raw);
+        println!("Map: {:?}", coverage_map);
+
+        Ok((coverage_raw, coverage_data, coverage_map))
     }
 
     pub(crate) fn corpus_for(&self, target: &Target) -> Result<PathBuf> {
         let mut p = self.get_fuzz_dir().to_owned();
         p.push("corpus");
-        p.push(target.get_module_name());
+        p.push(target.get_target_module());
         p.push(target.get_target_function());
         fs::create_dir_all(&p)
             .with_context(|| format!("could not make a corpus directory at {:?}", p))?;
@@ -193,7 +204,7 @@ impl FuzzProject {
     pub(crate) fn artifacts_for(&self, target: &Target) -> Result<PathBuf> {
         let mut p = self.get_fuzz_dir().to_owned();
         p.push("artifacts");
-        p.push(target.get_module_name());
+        p.push(target.get_target_module());
         p.push(target.get_target_function());
 
         // This adds a trailing slash, which is necessary for libFuzzer, because
