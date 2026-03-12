@@ -1,4 +1,4 @@
-Move Fuzzer (`move-fuzz`)
+# Move Fuzzer (`move-fuzz`)
 
 Move Fuzzer is a fuzz-testing tool designed specifically for the Move programming language, with a particular focus on the Sui version developed by Mysten Labs. The primary goal of this project is to identify vulnerabilities, security flaws, and arithmetic errors, such as overflows, within smart contracts. It achieves this by executing programs with invalid, malformed, or random inputs and monitoring their behavior. 
 
