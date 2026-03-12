@@ -30,7 +30,7 @@ This script will automatically:
 
 Note: You can run the script with the `-clean` flag to perform a clean installation by removing existing build files first.
 
-## 🚀 Usage Guide
+## Usage Guide
 
 Interaction with the fuzzer happens via the `move-fuzz` command. Here are the essential commands to start testing your smart contracts:
 
